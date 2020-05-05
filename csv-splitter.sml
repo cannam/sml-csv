@@ -1,5 +1,5 @@
 
-structure CSVSplitter = struct
+structure CSVSplitter : CSV_SPLITTER = struct
 
     datatype separator = SEPARATOR of char
                                  
@@ -10,16 +10,16 @@ structure CSVSplitter = struct
     datatype escape_type = ESCAPE_AUTO
                          | ESCAPE_BACKSLASH
                          | ESCAPE_DOUBLING
-                              
-    datatype split_state = AFTER_SEPARATOR
-                         | IN_UNQUOTED
-                         | IN_QUOTED of char
 
     type params = {
         separator : separator,
         quote_type : quote_type,
         escape_type : escape_type
     }
+                              
+    datatype split_state = AFTER_SEPARATOR
+                         | IN_UNQUOTED
+                         | IN_QUOTED of char
                                             
     fun split (params : params) line =
         let fun isQuote char =
