@@ -7,6 +7,54 @@ structure CSVReader : CSV_READER = struct
                                    val compare = String.compare
                                    end)
 
+    datatype separator = SEPARATOR of char
+                                 
+    datatype quote_type = NO_QUOTING
+                        | QUOTE_AUTO
+                        | QUOTE_CHAR of char
+                                 
+    datatype escape_type = ESCAPE_AUTO
+                         | ESCAPE_BACKSLASH
+                         | ESCAPE_DOUBLING
+                              
+    datatype split_state = AFTER_SEPARATOR
+                         | IN_UNQUOTED
+                         | IN_QUOTED of char
+
+    fun split (sep : separator, quote : quote_type, esc : escape_type) line =
+        let fun isQuote char =
+                case quote of
+                    NO_QUOTING => false
+                  | QUOTE_AUTO => char = #"'" orelse char = #"\""
+                  | QUOTE_CHAR qc => char = qc
+
+            fun isSeparator char =
+                char = sep orelse
+                (sep = #" " andalso Char.isSpace char)
+
+            fun consume (char, (state, pending, tokens)) =
+                if isQuote char
+                then case state of
+                         AFTER_SEPARATOR => (IN_QUOTED char, [], tokens)
+                       | IN_UNQUOTED => (state, char :: pending, tokens)
+                       | IN_QUOTED qc => if char <> qc
+                                         then (state, char :: pending, tokens)
+                                         else (IN_UNQUOTED, pending, tokens)
+                else if isSeparator char
+                then case state of
+                         AFTER_SEPARATOR => if sep = #" "
+                                            then (state, [], tokens)
+                                            else (state, [], "" :: tokens)
+                       | IN_UNQUOTED => (AFTER_SEPARATOR, [],
+                                         (implode (rev pending)) :: tokens)
+                       | IN_QUOTED qc => (state, char :: pending, tokens)
+                else if char = #"\\"
+                                   
+            
+        in
+            rev (foldl consume (AFTER_SEPARATOR, [], []) (explode line))
+        end
+                                            
     fun trim str =
         hd (String.fields (fn x => x = #"\n" orelse x = #"\r") str)
 
