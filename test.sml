@@ -30,27 +30,27 @@ val testcases_defaultparams = [
     },
     { name = "descaped",
       input = "a,\"b,c\\\",d\"",
-      expected = ["a", "b,c\"d"]
+      expected = ["a", "b,c\",d"]
     },
     { name = "sescaped",
       input = "a,'b,c\\',d'",
-      expected = ["a", "b,c\"d"]
+      expected = ["a", "b,c',d"]
     },
     { name = "ddescaped",
       input = "a,\"b,c\"\",d\"",
-      expected = ["a", "b,c\"d"]
+      expected = ["a", "b,c\",d"]
     },
     { name = "sdescaped",
       input = "a,'b,c'',d'",
-      expected = ["a", "b,c'd"]
+      expected = ["a", "b,c',d"]
     },
     { name = "dnested",
       input = "a,\"b,c',d\",e",
-      expected = ["a", "b,c'd", "e"]
+      expected = ["a", "b,c',d", "e"]
     },
     { name = "snested",
       input = "a,'b,c\",d',e",
-      expected = ["a", "b,c\"d", "e"]
+      expected = ["a", "b,c\",d", "e"]
     },
     { name = "dnested2",
       input = "aa,\"bb,cc',dd\"",
@@ -81,11 +81,11 @@ val testcases_defaultparams = [
       expected = ["a'a", "bb", "\"cc\"", "dd\""]
     },
     { name = "qspace",
-      input = "\"a,a\" \"b,b\" \"c,d\"",
+      input = "\"a,a\" \"b,b\" c,d\"",
       (* Can't start a quote in the middle of a bare field - they are
          handled only if the first character in the field is a
          quote. Otherwise we'd have trouble with apostrophes etc *)
-      expected = ["a,a \"b,b\" \"c", "d\""]
+      expected = ["a,a \"b","b\" c", "d\""]
     },
     { name = "multispace",
       input = ",,a'a,\\',,,,,,,,,'bb',,,,',,,,,,\\\"cc\",',dd\\\",'",
