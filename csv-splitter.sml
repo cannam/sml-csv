@@ -17,7 +17,8 @@ structure CSVSplitter : CSV_SPLITTER = struct
         escape_type : escape_type
     }
                               
-    datatype split_state = AFTER_SEPARATOR
+    datatype split_state = AT_START
+                         | AFTER_SEPARATOR
                          | IN_UNQUOTED
                          | IN_QUOTED of char
                                             
@@ -45,17 +46,19 @@ structure CSVSplitter : CSV_SPLITTER = struct
                 then (state, false, char :: pending, tokens)
                 else if isQuote char
                 then case state of
-                         AFTER_SEPARATOR =>
-                         (IN_QUOTED char, false, [], tokens)
-                       | IN_UNQUOTED =>
+                         IN_UNQUOTED =>
                          (state, false, char :: pending, tokens)
                        | IN_QUOTED qc =>
                          if char <> qc
                          then (state, false, char :: pending, tokens)
                          else (IN_UNQUOTED, false, pending, tokens)
+                       | _ => 
+                         (IN_QUOTED char, false, [], tokens)
                 else if isSeparator char
                 then case state of
-                         AFTER_SEPARATOR =>
+                         AT_START =>
+                         (AFTER_SEPARATOR, false, [], "" :: tokens)
+                       | AFTER_SEPARATOR =>
                          if (#separator params) = SEPARATOR #" "
                          then (state, false, [], tokens)
                          else (state, false, [], "" :: tokens)
@@ -66,18 +69,22 @@ structure CSVSplitter : CSV_SPLITTER = struct
                          (state, false, char :: pending, tokens)
                 else if isBackslashEscape char
                 then case state of
-                         AFTER_SEPARATOR =>
+                         AT_START =>
+                         (IN_UNQUOTED, true, [], tokens)
+                       | AFTER_SEPARATOR =>
                          (IN_UNQUOTED, true, [], tokens)
                        | _ =>
                          (state, true, pending, tokens)
                 else case state of
-                         AFTER_SEPARATOR =>
+                         AT_START => 
+                         (IN_UNQUOTED, false, [char], tokens)
+                       | AFTER_SEPARATOR =>
                          (IN_UNQUOTED, false, [char], tokens)
                        | _ =>
                          (state, false, char :: pending, tokens)
 
             val (state, escaping, pending, tokens) = 
-                foldl consume (AFTER_SEPARATOR, false, [], []) (explode line)
+                foldl consume (AT_START, false, [], []) (explode line)
 
             val (state, escaping, pending, tokens) =
                 if escaping
@@ -85,7 +92,9 @@ structure CSVSplitter : CSV_SPLITTER = struct
                 else (state, false, pending, tokens)
         in
             rev (case (state, pending, tokens) of
-                     (AFTER_SEPARATOR, pending, tokens) =>
+                     (AT_START, pending, tokens) =>
+                     tokens
+                   | (AFTER_SEPARATOR, pending, tokens) =>
                      (implode (rev pending)) :: tokens
                    | (IN_UNQUOTED, pending, tokens) =>
                      (implode (rev pending)) :: tokens
