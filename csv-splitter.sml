@@ -21,8 +21,13 @@ structure CSVSplitter : CSV_SPLITTER = struct
                          | AFTER_SEPARATOR
                          | IN_UNQUOTED
                          | IN_QUOTED of char
+
+    datatype escape_state = NOT_ESCAPING
+                          | BACKSLASH_ESCAPING
+                          | DOUBLE_ESCAPING of char
                                             
     fun split (params : params) line =
+
         let fun isQuote char =
                 case (#quote_type params) of
                     NO_QUOTING => false
@@ -40,56 +45,71 @@ structure CSVSplitter : CSV_SPLITTER = struct
                   | (ESCAPE_BACKSLASH, #"\\") => true
                   | _ => false
 
-            (*!!! todo: ESCAPE_DOUBLING *)
-            fun consume (char, (state, escaping, pending, tokens)) =
-                if escaping
-                then (state, false, char :: pending, tokens)
-                else if isQuote char
+            val haveDoublingEscapes =
+                case #escape_type params of
+                    ESCAPE_AUTO => true
+                  | ESCAPE_DOUBLING => true
+                  | _ => false
+                             
+            fun consume (char, (state, BACKSLASH_ESCAPING, pending, tokens)) =
+                (state, NOT_ESCAPING, char :: pending, tokens)
+              | consume (char, (state, DOUBLE_ESCAPING eq, pending, tokens)) =
+                if char = eq
+                then (state, NOT_ESCAPING, char :: pending, tokens)
+                else consume (char, (IN_UNQUOTED, NOT_ESCAPING, pending, tokens))
+              | consume (char, (state, NOT_ESCAPING, pending, tokens)) =
+                if isQuote char
                 then case state of
                          IN_UNQUOTED =>
-                         (state, false, char :: pending, tokens)
+                         (state, NOT_ESCAPING, char :: pending, tokens)
                        | IN_QUOTED qc =>
-                         if char <> qc
-                         then (state, false, char :: pending, tokens)
-                         else (IN_UNQUOTED, false, pending, tokens)
+                         if char = qc
+                         then if haveDoublingEscapes
+                              then (state, DOUBLE_ESCAPING qc, pending, tokens)
+                              else (IN_UNQUOTED, NOT_ESCAPING, pending, tokens)
+                         else (state, NOT_ESCAPING, char :: pending, tokens)
                        | _ => 
-                         (IN_QUOTED char, false, [], tokens)
+                         (IN_QUOTED char, NOT_ESCAPING, [], tokens)
                 else if isSeparator char
                 then case state of
                          AT_START =>
-                         (AFTER_SEPARATOR, false, [], "" :: tokens)
+                         (AFTER_SEPARATOR, NOT_ESCAPING, [], "" :: tokens)
                        | AFTER_SEPARATOR =>
                          if (#separator params) = SEPARATOR #" "
-                         then (state, false, [], tokens)
-                         else (state, false, [], "" :: tokens)
+                         then (state, NOT_ESCAPING, [], tokens)
+                         else (state, NOT_ESCAPING, [], "" :: tokens)
                        | IN_UNQUOTED =>
-                         (AFTER_SEPARATOR, false, [],
+                         (AFTER_SEPARATOR, NOT_ESCAPING, [],
                           (implode (rev pending)) :: tokens)
                        | IN_QUOTED qc =>
-                         (state, false, char :: pending, tokens)
+                         (state, NOT_ESCAPING, char :: pending, tokens)
                 else if isBackslashEscape char
                 then case state of
                          AT_START =>
-                         (IN_UNQUOTED, true, [], tokens)
+                         (IN_UNQUOTED, BACKSLASH_ESCAPING, [], tokens)
                        | AFTER_SEPARATOR =>
-                         (IN_UNQUOTED, true, [], tokens)
+                         (IN_UNQUOTED, BACKSLASH_ESCAPING, [], tokens)
                        | _ =>
-                         (state, true, pending, tokens)
+                         (state, BACKSLASH_ESCAPING, pending, tokens)
                 else case state of
                          AT_START => 
-                         (IN_UNQUOTED, false, [char], tokens)
+                         (IN_UNQUOTED, NOT_ESCAPING, [char], tokens)
                        | AFTER_SEPARATOR =>
-                         (IN_UNQUOTED, false, [char], tokens)
+                         (IN_UNQUOTED, NOT_ESCAPING, [char], tokens)
                        | _ =>
-                         (state, false, char :: pending, tokens)
+                         (state, NOT_ESCAPING, char :: pending, tokens)
 
             val (state, escaping, pending, tokens) = 
-                foldl consume (AT_START, false, [], []) (explode line)
+                foldl consume (AT_START, NOT_ESCAPING, [], []) (explode line)
 
             val (state, escaping, pending, tokens) =
-                if escaping
-                then (state, false, #"\\" :: pending, tokens)
-                else (state, false, pending, tokens)
+                case escaping of
+                    NOT_ESCAPING =>
+                    (state, escaping, pending, tokens)
+                  | BACKSLASH_ESCAPING => 
+                    (state, NOT_ESCAPING, #"\\" :: pending, tokens)
+                  | DOUBLE_ESCAPING eq => (* just a normal close-quote at EOL *)
+                    (IN_UNQUOTED, NOT_ESCAPING, pending, tokens)
         in
             rev (case (state, pending, tokens) of
                      (AT_START, pending, tokens) =>
