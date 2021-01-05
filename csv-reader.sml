@@ -1,11 +1,10 @@
 
 structure CSVReader : CSV_READER = struct
 
-(*!!! should be functorised *)
-    structure Map = RedBlackMapFn(struct
-                                   type ord_key = string
-                                   val compare = String.compare
-                                   end)
+    structure StringMap = RedBlackMapFn(struct
+                                         type ord_key = string
+                                         val compare = String.compare
+                                         end)
 
     val split = CSVSplitter.split {
             separator = CSVSplitter.SEPARATOR #",",
@@ -18,7 +17,7 @@ structure CSVReader : CSV_READER = struct
 
     fun foldlStream f acc stream =
         case TextIO.inputLine stream of
-	    SOME line => foldlStream f (f (split line, acc)) stream
+	    SOME line => foldlStream f (f (split (trim line), acc)) stream
           | NONE => acc
 
     fun foldlFile f acc file =
@@ -28,43 +27,51 @@ structure CSVReader : CSV_READER = struct
             result before TextIO.closeIn stream
         end
 
+    (* ListPair.zip ignores the excess from the tail of the longer
+       list (it has to, as it doesn't know what an "empty element"
+       looks like) but we want to pad the shorter *)
+    fun zip ([], []) = []
+      | zip (x::xs, []) = (x, "") :: zip (xs, [])
+      | zip ([], y::ys) = ("", y) :: zip ([], ys)
+      | zip (x::xs, y::ys) = (x, y) :: zip (xs, ys)
+
     fun mapRow (headers, fields) =
-        List.foldl Map.insert' Map.empty (ListPair.zip (headers, fields))
-
-    fun foldlStreamCols f acc (stream, headers) =
-        case TextIO.inputLine stream of
-	    SOME line => foldlStreamCols f (f (mapRow (headers, split line),
-                                               acc))
-                                         (stream, headers)
-          | NONE => acc
-
-    fun foldlFileCols f acc file =
-        let val stream = TextIO.openIn file
-            val headers =
-                case TextIO.inputLine stream of
-                    SOME line => split line
-                  | NONE => []
-            val result =
-                case headers of
-                    [] => acc
-                  | _ => foldlStreamCols f acc (stream, headers)
-        in
-            result before TextIO.closeIn stream
-        end
+        List.foldl StringMap.insert' StringMap.empty (zip (headers, fields))
 
     fun loadFile file =
         rev (foldlFile (op::) [] file)
-
+            
     fun loadFileCols file =
-        rev (foldlFileCols (op::) [] file)
+        let val stream = TextIO.openIn file
+            val headers =
+                case TextIO.inputLine stream of
+                    SOME line => split (trim line)
+                  | NONE => []
+            fun folder (fields, m) =
+                List.foldl (fn ((header, field), m) =>
+                               StringMap.insert
+                                   (m, header,
+                                    case StringMap.find (m, header) of
+                                        NONE => [field]
+                                      | SOME ff => field :: ff))
+                           m
+                           (zip (headers, fields))
+            val result =
+                case headers of
+                    [] => StringMap.empty
+                  | _ => foldlStream folder StringMap.empty stream
+        in
+            StringMap.map List.rev result
+            before TextIO.closeIn stream
+        end
 
     fun loadFileRows file =
         let fun add (row, map) =
                 case row of
-                    header::rest => Map.insert (map, header, rest)
+                    header::rest => StringMap.insert (map, header, rest)
                   | [] => map
         in
-            foldlFile add Map.empty file
+            foldlFile add StringMap.empty file
         end
 
     fun loadFileRowsAndCols file =
@@ -73,15 +80,48 @@ structure CSVReader : CSV_READER = struct
                 case TextIO.inputLine stream of
                     NONE => []
                   | SOME line =>
-                    case split line of
+                    case split (trim line) of
                         rowhead::rest => rest
                       | [] => []
             fun add (row, map) =
                 case row of
-                    rowhead::rest => Map.insert (map, rowhead,
-                                                 mapRow (headers, rest))
-                  | [] => map
-            val result = foldlStream add Map.empty stream
+                    [] => map
+                  | rowhead::rest => StringMap.insert (map, rowhead,
+                                                       mapRow (headers, rest))
+            val result = foldlStream add StringMap.empty stream
+        in
+            result before TextIO.closeIn stream
+        end
+
+    fun loadFileColsAndRows file =
+        let val stream = TextIO.openIn file
+            val headers =
+                case TextIO.inputLine stream of
+                    SOME line => split (trim line)
+                  | NONE => []
+            (* first col no good, as we have row-heads: *)
+            val headers =
+                case headers of
+                    [] => []
+                  | h::hs => hs
+            fun folder (row, m) =
+                case row of
+                    [] => m
+                  | rowhead::rest =>
+                    List.foldl (fn ((header, field), m) =>
+                                   StringMap.insert
+                                       (m, header,
+                                        StringMap.insert
+                                            (case StringMap.find (m, header) of
+                                                 NONE => StringMap.empty
+                                               | SOME rm => rm,
+                                             rowhead, field)))
+                               m
+                               (zip (headers, rest))
+            val result =
+                case headers of
+                    [] => StringMap.empty
+                  | _ => foldlStream folder StringMap.empty stream
         in
             result before TextIO.closeIn stream
         end
