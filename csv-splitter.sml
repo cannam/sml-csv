@@ -16,7 +16,13 @@ structure CSVSplitter : CSV_SPLITTER = struct
         quote_type : quote_type,
         escape_type : escape_type
     }
-                              
+
+    val defaultParams : params = {
+        separator = SEPARATOR #",",
+        quote_type = QUOTE_AUTO,
+        escape_type = ESCAPE_BACKSLASH
+    }
+                                      
     datatype split_state = AT_START
                          | AFTER_SEPARATOR
                          | IN_UNQUOTED

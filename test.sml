@@ -136,7 +136,7 @@ val loading_tests = [
     
     ("loading-plain",
      fn () => 
-        let val ll = CSVReader.loadFile testfile
+        let val ll = CSVReader.loadFile CSVSplitter.defaultParams testfile
         in
             TestSupport.check Int.toString (length ll, 3) andalso
             checkStringLists (hd ll, ["", "Col1", "Col2"]) andalso
@@ -146,7 +146,7 @@ val loading_tests = [
     
     ("loading-rows",
      fn () =>
-        let val lm = CSVReader.loadFileRows testfile
+        let val lm = CSVReader.loadFileRows CSVSplitter.defaultParams testfile
             val kk = M.listKeys lm
         in
             checkStringLists (kk, ["", "Row1", "Row2"]) andalso
@@ -158,7 +158,7 @@ val loading_tests = [
     
     ("loading-cols",
      fn () =>
-        let val lm = CSVReader.loadFileCols testfile
+        let val lm = CSVReader.loadFileCols CSVSplitter.defaultParams testfile
             val kk = M.listKeys lm
         in
             checkStringLists (kk, ["", "Col1", "Col2"]) andalso
@@ -170,7 +170,7 @@ val loading_tests = [
 
     ("loading-rowscols",
      fn () =>
-        let val mm = CSVReader.loadFileRowsAndCols testfile
+        let val mm = CSVReader.loadFileRowsAndCols CSVSplitter.defaultParams testfile
             val kk = M.listKeys mm
         in
             checkStringLists (kk, ["Row1", "Row2"]) andalso
@@ -186,7 +186,7 @@ val loading_tests = [
             
     ("loading-colsrows",
      fn () =>
-        let val mm = CSVReader.loadFileColsAndRows testfile
+        let val mm = CSVReader.loadFileColsAndRows CSVSplitter.defaultParams testfile
             val kk = M.listKeys mm
         in
             checkStringLists (kk, ["Col1", "Col2"]) andalso

@@ -1,28 +1,28 @@
 
 structure CSVReader : CSV_READER = struct
 
+    type params = CSVSplitter.params
+
     structure StringMap = RedBlackMapFn(struct
                                          type ord_key = string
                                          val compare = String.compare
                                          end)
-
-    val split = CSVSplitter.split {
-            separator = CSVSplitter.SEPARATOR #",",
-            quote_type = CSVSplitter.QUOTE_AUTO,
-            escape_type = CSVSplitter.ESCAPE_BACKSLASH
-        }
                                             
     fun trim str =
         hd (String.fields (fn x => x = #"\n" orelse x = #"\r") str)
 
-    fun foldlStream f acc stream =
+    fun split params =
+        fn line => CSVSplitter.split params (trim line)
+
+    fun foldlStream params f acc stream =
         case TextIO.inputLine stream of
-	    SOME line => foldlStream f (f (split (trim line), acc)) stream
+	    SOME line =>
+            foldlStream params f (f (split params line, acc)) stream
           | NONE => acc
 
-    fun foldlFile f acc file =
+    fun foldlFile params f acc file =
         let val stream = TextIO.openIn file
-            val result = foldlStream f acc stream
+            val result = foldlStream params f acc stream
         in
             result before TextIO.closeIn stream
         end
@@ -38,14 +38,15 @@ structure CSVReader : CSV_READER = struct
     fun mapRow (headers, fields) =
         List.foldl StringMap.insert' StringMap.empty (zip (headers, fields))
 
-    fun loadFile file =
-        rev (foldlFile (op::) [] file)
+    fun loadFile params file =
+        rev (foldlFile params (op::) [] file)
             
-    fun loadFileCols file =
+    fun loadFileCols params file =
         let val stream = TextIO.openIn file
+            val split = split params
             val headers =
                 case TextIO.inputLine stream of
-                    SOME line => split (trim line)
+                    SOME line => split line
                   | NONE => []
             fun folder (fields, m) =
                 List.foldl (fn ((header, field), m) =>
@@ -59,28 +60,29 @@ structure CSVReader : CSV_READER = struct
             val result =
                 case headers of
                     [] => StringMap.empty
-                  | _ => foldlStream folder StringMap.empty stream
+                  | _ => foldlStream params folder StringMap.empty stream
         in
             StringMap.map List.rev result
             before TextIO.closeIn stream
         end
 
-    fun loadFileRows file =
+    fun loadFileRows params file =
         let fun add (row, map) =
                 case row of
                     header::rest => StringMap.insert (map, header, rest)
                   | [] => map
         in
-            foldlFile add StringMap.empty file
+            foldlFile params add StringMap.empty file
         end
 
-    fun loadFileRowsAndCols file =
+    fun loadFileRowsAndCols params file =
         let val stream = TextIO.openIn file
+            val split = split params
             val headers =
                 case TextIO.inputLine stream of
                     NONE => []
                   | SOME line =>
-                    case split (trim line) of
+                    case split line of
                         rowhead::rest => rest
                       | [] => []
             fun add (row, map) =
@@ -88,16 +90,17 @@ structure CSVReader : CSV_READER = struct
                     [] => map
                   | rowhead::rest => StringMap.insert (map, rowhead,
                                                        mapRow (headers, rest))
-            val result = foldlStream add StringMap.empty stream
+            val result = foldlStream params add StringMap.empty stream
         in
             result before TextIO.closeIn stream
         end
 
-    fun loadFileColsAndRows file =
+    fun loadFileColsAndRows params file =
         let val stream = TextIO.openIn file
+            val split = split params
             val headers =
                 case TextIO.inputLine stream of
-                    SOME line => split (trim line)
+                    SOME line => split line
                   | NONE => []
             (* first col no good, as we have row-heads: *)
             val headers =
@@ -121,7 +124,7 @@ structure CSVReader : CSV_READER = struct
             val result =
                 case headers of
                     [] => StringMap.empty
-                  | _ => foldlStream folder StringMap.empty stream
+                  | _ => foldlStream params folder StringMap.empty stream
         in
             result before TextIO.closeIn stream
         end
