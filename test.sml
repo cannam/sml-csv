@@ -144,17 +144,20 @@ val loading_tests = [
             checkStringLists (hd (tl (tl ll)), ["Row2", "X", "Y"])
         end),
     
-    ("loading-rows",
-     fn () =>
-        let val lm = CSVReader.loadFileRows CSVSplitter.defaultParams testfile
-            val kk = M.listKeys lm
+    ("loading-headed",
+     fn () => 
+        let val ml = CSVReader.loadFileHeaded CSVSplitter.defaultParams testfile
         in
-            checkStringLists (kk, ["", "Row1", "Row2"]) andalso
-            checkStringLists (M.lookup (lm, ""), ["Col1", "Col2"]) andalso
-            checkStringLists (M.lookup (lm, "Row1"), ["A"]) andalso
-            checkStringLists (M.lookup (lm, "Row2"), ["X", "Y"])
-        end
-    ),
+            TestSupport.check Int.toString (length ml, 2) andalso
+            checkStringLists (M.listKeys (hd ml), ["", "Col1", "Col2"]) andalso
+            checkStringLists (M.listKeys (hd (tl ml)), ["", "Col1", "Col2"]) andalso
+            checkStrings (M.lookup (hd ml, ""), "Row1") andalso
+            checkStrings (M.lookup (hd ml, "Col1"), "A") andalso
+            checkStrings (M.lookup (hd ml, "Col2"), "") andalso
+            checkStrings (M.lookup (hd (tl ml), ""), "Row2") andalso
+            checkStrings (M.lookup (hd (tl ml), "Col1"), "X") andalso
+            checkStrings (M.lookup (hd (tl ml), "Col2"), "Y") 
+        end),
     
     ("loading-cols",
      fn () =>
@@ -165,6 +168,18 @@ val loading_tests = [
             checkStringLists (M.lookup (lm, ""), ["Row1", "Row2"]) andalso
             checkStringLists (M.lookup (lm, "Col1"), ["A", "X"]) andalso
             checkStringLists (M.lookup (lm, "Col2"), ["", "Y"])
+        end
+    ),
+    
+    ("loading-rows",
+     fn () =>
+        let val lm = CSVReader.loadFileRows CSVSplitter.defaultParams testfile
+            val kk = M.listKeys lm
+        in
+            checkStringLists (kk, ["", "Row1", "Row2"]) andalso
+            checkStringLists (M.lookup (lm, ""), ["Col1", "Col2"]) andalso
+            checkStringLists (M.lookup (lm, "Row1"), ["A"]) andalso
+            checkStringLists (M.lookup (lm, "Row2"), ["X", "Y"])
         end
     ),
 

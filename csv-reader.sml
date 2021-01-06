@@ -41,6 +41,31 @@ structure CSVReader : CSV_READER = struct
     fun loadFile params file =
         rev (foldlFile params (op::) [] file)
             
+    fun foldlStreamHeaded params f acc (stream, headers) =
+        case TextIO.inputLine stream of
+	    SOME line => foldlStreamHeaded
+                             params f (f (mapRow (headers, split params line),
+                                          acc))
+                             (stream, headers)
+          | NONE => acc
+
+    fun foldlFileHeaded params f acc file =
+        let val stream = TextIO.openIn file
+            val headers =
+                case TextIO.inputLine stream of
+                    SOME line => split params line
+                  | NONE => []
+            val result =
+                case headers of
+                    [] => acc
+                  | _ => foldlStreamHeaded params f acc (stream, headers)
+        in
+            result before TextIO.closeIn stream
+        end
+
+    fun loadFileHeaded params file =
+        rev (foldlFileHeaded params (op::) [] file)
+
     fun loadFileCols params file =
         let val stream = TextIO.openIn file
             val split = split params

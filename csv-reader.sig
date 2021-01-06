@@ -14,6 +14,11 @@ signature CSV_READER = sig
     val loadFile : params -> string -> string list list
 
     (** Open and parse the named file, treating the first row as a
+        series of column headers, and returning a list of rows, where
+        each row consists of a map from column header to value *)
+    val loadFileHeaded : params -> string -> string StringMap.map list
+
+    (** Open and parse the named file, treating the first row as a
         series of column headers, and returning a map from column
         header to a list of the values in that column *)
     val loadFileCols : params -> string -> string list StringMap.map
