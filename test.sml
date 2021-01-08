@@ -94,6 +94,37 @@ val testcases_defaultparams = [
     }    
 ]
 
+fun report converter (obtained, expected) =
+    print ("--- Expected " ^ (converter expected)
+           ^ "\n--- Obtained " ^ (converter obtained) ^ "\n")
+                                    
+fun checkWith converter comparator (a, b) =
+    if comparator (a, b) then true
+    else (report converter (a, b); false)
+
+fun check converter (a, b) = checkWith converter (op=) (a, b)
+
+fun checkListsWith converter comparator (a, b) =
+    let fun checkLists' ([], []) = true
+          | checkLists' (a', b') =
+            checkWith converter comparator (hd a', hd b') andalso
+            checkLists' (tl a', tl b')
+    in
+        if (List.length a <> List.length b)
+        then 
+            (print ("--- Lists have differing lengths (expected " ^
+                    (Int.toString (List.length b)) ^
+                    ", obtained " ^
+                    (Int.toString (List.length a)) ^ ": [" ^
+		    (String.concatWith "," (List.map converter a)) ^
+                    "])\n");
+             false)
+        else
+            checkLists' (a, b)
+    end
+
+fun checkLists converter (a, b) = checkListsWith converter (op=) (a, b)
+
 val quoting_tests =
     map (fn { name, input, expected } =>
             ("quoting-" ^ name,
@@ -119,8 +150,25 @@ val quoting_tests =
 
 structure M = CSVReader.StringMap
 
-val testfile = "testfile.csv"
-
+fun testfile () =
+    let val filename = "testfile.csv"
+        val candidateDirectories = ["sml-csv", "."]
+	in
+	    case foldl (fn (candidate, SOME acceptable) => SOME acceptable
+                         | (candidate, NONE) =>
+                           if OS.FileSys.access (candidate ^ "/" ^ filename,
+                                                 [OS.FileSys.A_READ])
+			   then SOME candidate
+			   else NONE)
+		       NONE
+		       candidateDirectories of
+		NONE => raise Fail
+                              ("Test file not found (candidate dirs: "
+			       ^ String.concatWith ", " candidateDirectories
+                               ^ ")")
+	      | SOME acceptable => acceptable ^ "/" ^ filename
+    end
+                   
 (* testfile looks like this:
 
 ,Col1,Col2
@@ -129,16 +177,16 @@ Row2,X,Y
 
 *)
                    
-val checkStringLists = TestSupport.checkLists (fn s => s)
-val checkStrings = TestSupport.check (fn s => s)
+val checkStringLists = checkLists (fn s => s)
+val checkStrings = check (fn s => s)
                    
 val loading_tests = [
     
     ("loading-plain",
      fn () => 
-        let val ll = CSVReader.loadFile CSVSplitter.defaultParams testfile
+        let val ll = CSVReader.loadFile CSVSplitter.defaultParams (testfile ())
         in
-            TestSupport.check Int.toString (length ll, 3) andalso
+            check Int.toString (length ll, 3) andalso
             checkStringLists (hd ll, ["", "Col1", "Col2"]) andalso
             checkStringLists (hd (tl ll), ["Row1", "A"]) andalso
             checkStringLists (hd (tl (tl ll)), ["Row2", "X", "Y"])
@@ -146,9 +194,9 @@ val loading_tests = [
     
     ("loading-headed",
      fn () => 
-        let val ml = CSVReader.loadFileHeaded CSVSplitter.defaultParams testfile
+        let val ml = CSVReader.loadFileHeaded CSVSplitter.defaultParams (testfile ())
         in
-            TestSupport.check Int.toString (length ml, 2) andalso
+            check Int.toString (length ml, 2) andalso
             checkStringLists (M.listKeys (hd ml), ["", "Col1", "Col2"]) andalso
             checkStringLists (M.listKeys (hd (tl ml)), ["", "Col1", "Col2"]) andalso
             checkStrings (M.lookup (hd ml, ""), "Row1") andalso
@@ -161,7 +209,7 @@ val loading_tests = [
     
     ("loading-cols",
      fn () =>
-        let val lm = CSVReader.loadFileCols CSVSplitter.defaultParams testfile
+        let val lm = CSVReader.loadFileCols CSVSplitter.defaultParams (testfile ())
             val kk = M.listKeys lm
         in
             checkStringLists (kk, ["", "Col1", "Col2"]) andalso
@@ -173,7 +221,7 @@ val loading_tests = [
     
     ("loading-rows",
      fn () =>
-        let val lm = CSVReader.loadFileRows CSVSplitter.defaultParams testfile
+        let val lm = CSVReader.loadFileRows CSVSplitter.defaultParams (testfile ())
             val kk = M.listKeys lm
         in
             checkStringLists (kk, ["", "Row1", "Row2"]) andalso
@@ -185,7 +233,7 @@ val loading_tests = [
 
     ("loading-rowscols",
      fn () =>
-        let val mm = CSVReader.loadFileRowsAndCols CSVSplitter.defaultParams testfile
+        let val mm = CSVReader.loadFileRowsAndCols CSVSplitter.defaultParams (testfile ())
             val kk = M.listKeys mm
         in
             checkStringLists (kk, ["Row1", "Row2"]) andalso
@@ -201,7 +249,7 @@ val loading_tests = [
             
     ("loading-colsrows",
      fn () =>
-        let val mm = CSVReader.loadFileColsAndRows CSVSplitter.defaultParams testfile
+        let val mm = CSVReader.loadFileColsAndRows CSVSplitter.defaultParams (testfile ())
             val kk = M.listKeys mm
         in
             checkStringLists (kk, ["Col1", "Col2"]) andalso
@@ -215,11 +263,19 @@ val loading_tests = [
             checkStrings (M.lookup (M.lookup (mm, "Col2"), "Row2"), "Y")
         end)
 ]
-    
-fun main () =
-    if TestRunner.run ("csv",
-                       quoting_tests @
-                       loading_tests)
-    then OS.Process.exit OS.Process.success
-    else OS.Process.exit OS.Process.failure
 
+val csv_tests = quoting_tests @ loading_tests
+
+fun main () =
+    let val result =
+            foldl (fn ((name, test), success) =>
+                      if test ()
+                      then success
+                      else false)
+                  true
+                  csv_tests
+    in
+        if result
+        then print "All tests passed\n"
+        else print "Some tests failed\n"
+    end
