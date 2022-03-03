@@ -1,8 +1,13 @@
 
 signature CSV_SPLITTER = sig
 
-    (** Field separator *)
+    (** Field separator. SEPARATOR denotes strictly a single
+        character, so multiple separator characters in a row (even if
+        they are spaces) will be interpreted as multiple empty
+        fields. SEPARATOR_WHITESPACE denotes that fields may be
+        separated by any amount of any whitespace character. *)
     datatype separator = SEPARATOR of char
+                       | SEPARATOR_WHITESPACE
 
     (** Type of field quote character to expect. QUOTE_CHAR specifies
         a single specific character, while QUOTE_AUTO permits either

@@ -2,6 +2,7 @@
 structure CSVSplitter : CSV_SPLITTER = struct
 
     datatype separator = SEPARATOR of char
+                       | SEPARATOR_WHITESPACE
                                  
     datatype quote_type = NO_QUOTING
                         | QUOTE_AUTO
@@ -42,8 +43,8 @@ structure CSVSplitter : CSV_SPLITTER = struct
 
             fun isSeparator char =
                 case (#separator params) of
-                    SEPARATOR s => char = s orelse
-                                   (s = #" " andalso Char.isSpace char)
+                    SEPARATOR s => char = s
+                  | SEPARATOR_WHITESPACE => Char.isSpace char
 
             fun isBackslashEscape char =
                 case (#escape_type params, char) of
@@ -81,9 +82,11 @@ structure CSVSplitter : CSV_SPLITTER = struct
                          AT_START =>
                          (AFTER_SEPARATOR, NOT_ESCAPING, [], "" :: tokens)
                        | AFTER_SEPARATOR =>
-                         if (#separator params) = SEPARATOR #" "
-                         then (state, NOT_ESCAPING, [], tokens)
-                         else (state, NOT_ESCAPING, [], "" :: tokens)
+                         (case #separator params of
+                              SEPARATOR_WHITESPACE =>
+                              (state, NOT_ESCAPING, [], tokens)
+                            | _ =>
+                              (state, NOT_ESCAPING, [], "" :: tokens))
                        | IN_UNQUOTED =>
                          (AFTER_SEPARATOR, NOT_ESCAPING, [],
                           (implode (rev pending)) :: tokens)
