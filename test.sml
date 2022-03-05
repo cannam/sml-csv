@@ -167,39 +167,40 @@ fun checkListsWith converter comparator (a, b) =
 fun checkLists converter (a, b) = checkListsWith converter (op=) (a, b)
 
 val quoting_tests =
-    ListMisc.concatMap (fn (sepname, separator, testcases) =>
-            map (fn { name, input, expected } =>
-                    ("quoting-" ^ sepname ^ "-" ^ name,
-                     fn () => 
-                        let val obtained =
-                                CSVSplitter.split {
-                                    separator = separator,
-                                    quote_type = CSVSplitter.QUOTE_AUTO,
-                                    escape_type = CSVSplitter.ESCAPE_AUTO
-                                } input
-                            fun conc ss = 
-                                String.concatWith
-                                    "," (map (fn s => "\"" ^ s ^ "\"") ss)
-                        in
-                            if obtained = expected
-                            then true
-                            else (print ("In test " ^ name ^ ":\n" ^
-                                         " -> for input: \"" ^ input ^ "\"\n" ^
-                                         " -> expected: [" ^ conc expected ^ "]\n" ^
-                                         " -> obtained: [" ^ conc obtained ^ "]\n");
-                                  false)
-                        end))
-                testcases)
-        [("comma",
-          CSVSplitter.SEPARATOR #",",
-          testcases_defaultparams),
-         ("spacechar",
-          CSVSplitter.SEPARATOR #" ",
-          testcases_spacechar_separator),
-         ("whitespace",
-          CSVSplitter.SEPARATOR_WHITESPACE,
-          testcases_whitespace_separator)
-        ]
+    List.concat
+        (map (fn (sepname, separator, testcases) =>
+                 map (fn { name, input, expected } =>
+                         ("quoting-" ^ sepname ^ "-" ^ name,
+                          fn () => 
+                             let val obtained =
+                                     CSVSplitter.split {
+                                         separator = separator,
+                                         quote_type = CSVSplitter.QUOTE_AUTO,
+                                         escape_type = CSVSplitter.ESCAPE_AUTO
+                                     } input
+                                 fun conc ss = 
+                                     String.concatWith
+                                         "," (map (fn s => "\"" ^ s ^ "\"") ss)
+                             in
+                                 if obtained = expected
+                                 then true
+                                 else (print ("In test " ^ name ^ ":\n" ^
+                                              " -> for input: \"" ^ input ^ "\"\n" ^
+                                              " -> expected: [" ^ conc expected ^ "]\n" ^
+                                              " -> obtained: [" ^ conc obtained ^ "]\n");
+                                       false)
+                             end))
+                     testcases)
+             [("comma",
+               CSVSplitter.SEPARATOR #",",
+               testcases_defaultparams),
+              ("spacechar",
+               CSVSplitter.SEPARATOR #" ",
+               testcases_spacechar_separator),
+              ("whitespace",
+               CSVSplitter.SEPARATOR_WHITESPACE,
+               testcases_whitespace_separator)
+             ])
         
 structure M = CSVReader.StringMap
 
